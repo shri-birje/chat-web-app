@@ -18,6 +18,7 @@ export default defineSchema({
     dmKey: v.string(),
     createdBy: v.id("users"),
     createdAt: v.number(),
+    updatedAt: v.number(),
     lastMessageText: v.optional(v.string()),
     lastMessageAt: v.optional(v.number()),
     lastMessageSenderId: v.optional(v.id("users")),

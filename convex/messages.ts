@@ -1,9 +1,13 @@
 import { v, ConvexError } from "convex/values";
 import { mutation } from "./_generated/server";
+import { getCurrentUser } from "./auth";
 
 export const sendMessage = mutation({
-  args: { conversationId: v.id("conversations"), meId: v.id("users"), body: v.string() },
-  handler: async (ctx, { conversationId, meId, body }) => {
+  args: { conversationId: v.id("conversations"), body: v.string() },
+  handler: async (ctx, { conversationId, body }) => {
+    const me = await getCurrentUser(ctx);
+    const meId = me._id;
+
     const text = body.trim();
     if (!text) return;
 
@@ -22,6 +26,7 @@ export const sendMessage = mutation({
       lastMessageText: text,
       lastMessageAt: now,
       lastMessageSenderId: meId,
+      updatedAt: now,
     });
 
     const members = await ctx.db

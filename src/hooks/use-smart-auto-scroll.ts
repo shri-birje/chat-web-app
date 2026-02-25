@@ -7,18 +7,21 @@ export function useSmartAutoScroll(depKey: string) {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+
+    const nearBottom =
+      el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+
     if (nearBottom) {
       el.scrollTop = el.scrollHeight;
-      setShowJump(false);
-    } else {
-      setShowJump(true);
     }
+
+    setShowJump(!nearBottom);
   }, [depKey]);
 
   const jumpToBottom = () => {
     const el = ref.current;
     if (!el) return;
+
     el.scrollTop = el.scrollHeight;
     setShowJump(false);
   };

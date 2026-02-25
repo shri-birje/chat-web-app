@@ -1,13 +1,14 @@
-import { v, ConvexError } from "convex/values";
+import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { getCurrentUser } from "./auth";
 
 const ONLINE_WINDOW_MS = 30_000;
 
 export const heartbeat = mutation({
-  args: { meId: v.id("users") },
-  handler: async (ctx, { meId }) => {
-    const user = await ctx.db.get(meId);
-    if (!user) throw new ConvexError("User not found");
+  args: {},
+  handler: async (ctx) => {
+    const me = await getCurrentUser(ctx);
+    const meId = me._id;
 
     const now = Date.now();
     const existing = await ctx.db
@@ -30,6 +31,7 @@ export const heartbeat = mutation({
 export const getOnlineStatus = query({
   args: { userIds: v.array(v.id("users")) },
   handler: async (ctx, { userIds }) => {
+    await getCurrentUser(ctx);
     const now = Date.now();
     const rows = await Promise.all(
       userIds.map(async (userId) => {

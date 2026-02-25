@@ -1,5 +1,6 @@
-import { v, ConvexError } from "convex/values";
+import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { getCurrentUser, requireIdentity } from "./auth";
 
 export const upsertMe = mutation({
   args: {
@@ -8,8 +9,8 @@ export const upsertMe = mutation({
     email: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new ConvexError("Unauthorized");
+    const identity = await requireIdentity(ctx);
+
     const clerkId = identity.subject ?? identity.tokenIdentifier;
     const now = Date.now();
 
@@ -19,7 +20,10 @@ export const upsertMe = mutation({
       .unique();
 
     if (existing) {
-      await ctx.db.patch(existing._id, { ...args, updatedAt: now });
+      await ctx.db.patch(existing._id, {
+        ...args,
+        updatedAt: now,
+      });
       return existing._id;
     }
 
@@ -32,10 +36,19 @@ export const upsertMe = mutation({
   },
 });
 
+export const me = query({
+  args: {},
+  handler: async (ctx) => {
+    return await getCurrentUser(ctx);
+  },
+});
+
 export const searchUsers = query({
-  args: { search: v.string(), meId: v.id("users") },
-  handler: async (ctx, { search, meId }) => {
+  args: { search: v.string() },
+  handler: async (ctx, { search }) => {
+    const me = await getCurrentUser(ctx);
     const term = search.trim();
+
     const rows = term
       ? await ctx.db
           .query("users")
@@ -43,6 +56,6 @@ export const searchUsers = query({
           .take(30)
       : await ctx.db.query("users").take(50);
 
-    return rows.filter((u) => u._id !== meId);
+    return rows.filter((u) => u._id !== me._id);
   },
 });

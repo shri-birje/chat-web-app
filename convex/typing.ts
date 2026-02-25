@@ -1,15 +1,26 @@
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { getCurrentUser } from "./auth";
 
 const TYPING_TTL_MS = 2_500;
 
 export const setTyping = mutation({
   args: {
     conversationId: v.id("conversations"),
-    meId: v.id("users"),
     typing: v.boolean(),
   },
-  handler: async (ctx, { conversationId, meId, typing }) => {
+  handler: async (ctx, { conversationId, typing }) => {
+    const me = await getCurrentUser(ctx);
+    const meId = me._id;
+
+    const membership = await ctx.db
+      .query("conversationMembers")
+      .withIndex("by_conversation_user", (q) =>
+        q.eq("conversationId", conversationId).eq("userId", meId)
+      )
+      .unique();
+    if (!membership) throw new ConvexError("Forbidden");
+
     const existing = await ctx.db
       .query("typingStates")
       .withIndex("by_conversation_user", (q) =>
@@ -37,8 +48,19 @@ export const setTyping = mutation({
 });
 
 export const listTypingUsers = query({
-  args: { conversationId: v.id("conversations"), meId: v.id("users") },
-  handler: async (ctx, { conversationId, meId }) => {
+  args: { conversationId: v.id("conversations") },
+  handler: async (ctx, { conversationId }) => {
+    const me = await getCurrentUser(ctx);
+    const meId = me._id;
+
+    const membership = await ctx.db
+      .query("conversationMembers")
+      .withIndex("by_conversation_user", (q) =>
+        q.eq("conversationId", conversationId).eq("userId", meId)
+      )
+      .unique();
+    if (!membership) throw new ConvexError("Forbidden");
+
     const now = Date.now();
     const rows = await ctx.db
       .query("typingStates")
