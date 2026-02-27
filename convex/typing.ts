@@ -1,15 +1,13 @@
 import { v, ConvexError } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internal } from "./_generated/api";
+import { internalMutation, mutation, query } from "./_generated/server";
 import { getCurrentUser } from "./auth";
 
-const TYPING_TTL_MS = 2_500;
+const TYPING_TTL_MS = 3_000;
 
 export const setTyping = mutation({
-  args: {
-    conversationId: v.id("conversations"),
-    typing: v.boolean(),
-  },
-  handler: async (ctx, { conversationId, typing }) => {
+  args: { conversationId: v.id("conversations") },
+  handler: async (ctx, { conversationId }) => {
     const me = await getCurrentUser(ctx);
     const meId = me._id;
 
@@ -28,21 +26,21 @@ export const setTyping = mutation({
       )
       .unique();
 
-    if (!typing) {
-      if (existing) await ctx.db.delete(existing._id);
-      return;
-    }
-
     const expiresAt = Date.now() + TYPING_TTL_MS;
     if (existing) {
       await ctx.db.patch(existing._id, { expiresAt });
-      return;
+    } else {
+      await ctx.db.insert("typingStates", {
+        conversationId,
+        userId: meId,
+        expiresAt,
+      });
     }
 
-    await ctx.db.insert("typingStates", {
+    await ctx.scheduler.runAfter(TYPING_TTL_MS + 50, internal.typing.clearExpiredTyping, {
       conversationId,
       userId: meId,
-      expiresAt,
+      expectedExpiresAt: expiresAt,
     });
   },
 });
@@ -67,8 +65,28 @@ export const listTypingUsers = query({
       .withIndex("by_conversation", (q) => q.eq("conversationId", conversationId))
       .collect();
 
-    return rows
-      .filter((row) => row.userId !== meId && row.expiresAt > now)
-      .map((row) => row.userId);
+    return rows.filter((row) => row.expiresAt > now).map((row) => row.userId);
+  },
+});
+
+export const clearExpiredTyping = internalMutation({
+  args: {
+    conversationId: v.id("conversations"),
+    userId: v.id("users"),
+    expectedExpiresAt: v.number(),
+  },
+  handler: async (ctx, { conversationId, userId, expectedExpiresAt }) => {
+    const state = await ctx.db
+      .query("typingStates")
+      .withIndex("by_conversation_user", (q) =>
+        q.eq("conversationId", conversationId).eq("userId", userId)
+      )
+      .unique();
+
+    if (!state) return;
+    if (state.expiresAt !== expectedExpiresAt) return;
+    if (state.expiresAt > Date.now()) return;
+
+    await ctx.db.delete(state._id);
   },
 });

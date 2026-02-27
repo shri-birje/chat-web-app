@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { getCurrentUser } from "./auth";
 
-const ONLINE_WINDOW_MS = 30_000;
+const ONLINE_WINDOW_MS = 10_000;
 
 export const heartbeat = mutation({
   args: {},
@@ -49,5 +49,23 @@ export const getOnlineStatus = query({
     );
 
     return rows;
+  },
+});
+
+export const listOnlineUsers = query({
+  args: {},
+  handler: async (ctx) => {
+    await getCurrentUser(ctx);
+
+    const now = Date.now();
+    const cutoff = now - ONLINE_WINDOW_MS;
+    const rows = await ctx.db.query("presence").collect();
+
+    return rows
+      .filter((row) => row.lastSeenAt > cutoff)
+      .map((row) => ({
+        userId: row.userId,
+        lastSeenAt: row.lastSeenAt,
+      }));
   },
 });

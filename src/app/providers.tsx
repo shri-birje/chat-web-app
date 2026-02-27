@@ -15,7 +15,6 @@ export function Providers({ children }: { children: ReactNode }) {
     <ConvexProviderWithClerk
       client={convex}
       useAuth={useAuth}
-      jwtTemplate="convex"
     >
       <UserSync />
       {children}

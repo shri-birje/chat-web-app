@@ -1,3 +1,5 @@
+import { ChatClient } from "@/components/chat/chat-client";
+
 type ConversationPageProps = {
   params: {
     conversationId: string;
@@ -5,5 +7,5 @@ type ConversationPageProps = {
 };
 
 export default function ConversationPage({ params }: ConversationPageProps) {
-  return <div className="p-6">Conversation: {params.conversationId}</div>;
+  return <ChatClient selectedConversationId={params.conversationId} />;
 }

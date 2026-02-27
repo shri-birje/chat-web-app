@@ -40,6 +40,7 @@ async function loadConversationMembers(
         name: user.name,
         imageUrl: user.imageUrl,
         email: user.email,
+        lastReadAt: membership.lastReadAt,
       };
     })
   );
